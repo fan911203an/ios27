@@ -3,7 +3,9 @@
 //
 #import "iOS27Animations.h"
 
-@interface SBNotificationBannerDestination : NSObject @end
+@interface SBNotificationBannerDestination : NSObject
+- (void)presentBannerForNotificationRequest:(id)request;
+@end
 
 %hook SBNotificationBannerDestination
 - (void)presentBannerForNotificationRequest:(id)request {

@@ -126,10 +126,13 @@ void IOS27AnimateBannerIn(UIView *view) {
 
 #pragma mark - 应用开合 zoom 转场
 
-@implementation IOS27ZoomOverlay {
+@interface IOS27ZoomOverlay () {
     UIView *_overlay;
     BOOL _appIsOpen;
 }
+@end
+
+@implementation IOS27ZoomOverlay
 
 + (instancetype)shared {
     static IOS27ZoomOverlay *instance;
@@ -254,11 +257,14 @@ void IOS27AnimateBannerIn(UIView *view) {
 
 #pragma mark - 灵动岛：半透明玻璃胶囊 + 高光
 
-@implementation IOS27Island {
+@interface IOS27Island () {
     UIView *_pill;
     UILabel *_label;
     BOOL _visible;
 }
+@end
+
+@implementation IOS27Island
 
 + (instancetype)shared {
     static IOS27Island *instance;
