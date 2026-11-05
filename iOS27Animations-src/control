@@ -1,0 +1,10 @@
+Package: com.ios27.animations
+Name: iOS 27 Animations
+Version: 1.0.8
+Architecture: iphoneos-arm64e
+Description: 在 SpringBoard 上模拟 iOS 27 风格的动画：应用开合转场、灵动岛/状态栏、锁屏与通知、桌面图标动效。适用于 roothide（隐根）越狱。
+Maintainer: iOS27 Animations <noreply@ios27.dev>
+Author: iOS27 Animations
+Section: Tweaks
+Depends: ellekit (>= 1.0.0), preferenceloader (>= 2.2.4), firmware (>= 15.0)
+Conflicts:
