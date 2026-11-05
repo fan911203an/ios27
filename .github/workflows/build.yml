@@ -1,0 +1,51 @@
+name: Build iOS27Animations (arm64e)
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install roothide Theos fork + iOS SDK
+        run: |
+          git clone --recursive https://github.com/roothide/theos.git "$HOME/theos-roothide"
+          mkdir -p "$HOME/theos-roothide/sdks"
+          git clone --filter=blob:none --sparse https://github.com/theos/sdks.git /tmp/theos-sdks
+          cd /tmp/theos-sdks
+          git sparse-checkout set iPhoneOS16.5.sdk
+          mv iPhoneOS16.5.sdk "$HOME/theos-roothide/sdks/"
+          cd - && rm -rf /tmp/theos-sdks
+
+      - name: Install ldid
+        run: |
+          brew install ldid || brew install xerub/ldid/ldid || true
+          which ldid || echo "ldid not found"
+
+      - name: Build (roothide / arm64e)
+        run: |
+          export THEOS="$HOME/theos-roothide"
+          export THEOS_PACKAGE_SCHEME=roothide
+          export ARCHS=arm64e
+          PROJ_DIR=$(dirname "$(find . -maxdepth 3 -name Makefile -not -path '*/.*' | head -1)")
+          echo "Project dir: $PROJ_DIR"
+          cd "$PROJ_DIR"
+          make clean || true
+          make package FINALPACKAGE=1
+          DEB=$(find "$(pwd)" -name '*.deb' | head -1)
+          echo "Built DEB: $DEB"
+          echo "DEB_PATH=$DEB" >> "$GITHUB_ENV"
+
+      - name: Show package info
+        run: |
+          echo "DEB: $DEB_PATH"
+          dpkg-deb -f "$DEB_PATH" Package Version Architecture Depends || true
+
+      - name: Upload .deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: iOS27Animations-arm64e
+          path: ${{ env.DEB_PATH }}
+          if-no-files-found: error
