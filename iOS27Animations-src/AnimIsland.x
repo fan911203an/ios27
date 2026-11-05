@@ -1,22 +1,18 @@
 //
-//  AnimIsland.x — 灵动岛/状态栏
-//  通知横幅出现时，灵动岛胶囊展开演示
+//  AnimIsland.x — 灵动岛：通知到达时弹出玻璃胶囊
 //
 #import "iOS27Animations.h"
 
-// Hook 类的最小声明（仅为编译期类型完整）
 @interface SBNotificationBannerDestination : NSObject @end
 
 %hook SBNotificationBannerDestination
 - (void)presentBannerForNotificationRequest:(id)request {
     %orig;
     if (!IOS27Enabled() || !IOS27IslandEnabled()) return;
-    NSString *title = nil;
-    if ([request respondsToSelector:@selector(title)]) {
-        id t = [request title];
-        if ([t isKindOfClass:[NSString class]]) title = t;
+    NSString *text = nil;
+    if ([request respondsToSelector:NSSelectorFromString(@"title")]) {
+        text = [request valueForKey:@"title"];
     }
-    if (!title.length) title = @"通知";
-    [[IOS27Island shared] presentAnimated:YES text:title];
+    [[IOS27Island shared] presentAnimated:YES text:(text.length ? text : @"● ● ●")];
 }
 %end

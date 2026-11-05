@@ -1,10 +1,9 @@
 Package: com.ios27.animations
-Name: iOS 27 Animations
+Name: iOS 26 动画
 Version: 1.0.9
 Architecture: iphoneos-arm64e
-Description: 在 SpringBoard 上模拟 iOS 27 风格的动画：应用开合转场、灵动岛/状态栏、锁屏与通知、桌面图标动效。适用于 roothide（隐根）越狱。
-Maintainer: iOS27 Animations <noreply@ios27.dev>
-Author: iOS27 Animations
+Description: 模拟 iOS 26 Liquid Glass 动效——应用开合 zoom 转场 / 灵动岛玻璃胶囊 / 锁屏通知浮起 / 桌面图标液态回弹
+Author: fan911203an
+Maintainer: fan911203an
 Section: Tweaks
 Depends: ellekit (>= 1.0.0), preferenceloader (>= 2.2.4), firmware (>= 15.0)
-Conflicts:
