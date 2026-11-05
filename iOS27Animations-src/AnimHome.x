@@ -21,17 +21,18 @@
 }
 %end
 
-// 文件夹：弹簧放大渐显
+// 文件夹：弹簧放大渐显（幅度收敛 0.6→0.9，阻尼加大，避免生硬）
 %hook SBFolderController
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
     if (!IOS27Enabled() || !IOS27Home()) return;
-    self.view.alpha = 0.0;
-    self.view.transform = CGAffineTransformMakeScale(0.6, 0.6);
-    [UIView animateWithDuration:0.45
+    self.view.alpha = 0.62;
+    self.view.transform = CGAffineTransformMakeScale(0.9, 0.9);
+    [UIView animateWithDuration:0.48
                           delay:0
-         usingSpringWithDamping:0.75 initialSpringVelocity:0.5
-                        options:UIViewAnimationOptionCurveEaseOut
+         usingSpringWithDamping:0.84
+          initialSpringVelocity:0.25
+                        options:UIViewAnimationOptionCurveEaseOut | UIViewAnimationOptionBeginFromCurrentState
                      animations:^{
         self.view.transform = CGAffineTransformIdentity;
         self.view.alpha = 1.0;

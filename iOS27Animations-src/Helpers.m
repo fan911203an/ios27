@@ -1,6 +1,7 @@
 //
 //  Helpers.m
 //  iOS 27 Animations — 偏好读取与共享动效实现
+//  v1.0.9：动画质感优化（去掉闪黑遮罩、统一 spring 大阻尼曲线、时长加长）
 //
 
 #import "iOS27Animations.h"
@@ -9,7 +10,6 @@
 #pragma mark - 偏好读取
 
 static NSString *IOS27PrefsPath(void) {
-    // rootless (现代越狱, iOS 27) 优先，回退 rootful
     static NSString *path = nil;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
@@ -26,7 +26,6 @@ static NSString *IOS27PrefsPath(void) {
 }
 
 static NSDictionary *IOS27Prefs(void) {
-    // 每次实时读取，设置里切开关即时生效，无需 respring
     NSMutableDictionary *d = [NSMutableDictionary dictionaryWithDictionary:
                               [NSDictionary dictionaryWithContentsOfFile:IOS27PrefsPath()] ?: @{}];
     if (!d[@"enabled"])       d[@"enabled"]       = @YES;
@@ -43,62 +42,57 @@ BOOL IOS27IslandEnabled(void) { return [IOS27Prefs()[@"island"] boolValue]; }
 BOOL IOS27Lockscreen(void)    { return [IOS27Prefs()[@"lockscreen"] boolValue]; }
 BOOL IOS27Home(void)          { return [IOS27Prefs()[@"home"] boolValue]; }
 
-#pragma mark - 通用动画辅助
+#pragma mark - 通用动画辅助（统一 iOS 风格 spring 参数）
 
-// 弹簧缩放动画
 CABasicAnimation *IOS27SpringScale(CGFloat from, CGFloat to) {
     CASpringAnimation *s = [CASpringAnimation animationWithKeyPath:@"transform.scale"];
-    s.fromValue = @(from);
-    s.toValue = @(to);
-    s.damping = 12.0;
-    s.stiffness = 180.0;
-    s.mass = 1.0;
-    s.initialVelocity = 10.0;
-    s.duration = s.settlingDuration;
+    s.fromValue   = @(from);
+    s.toValue     = @(to);
+    s.damping     = 16.0;      // 更大阻尼 → 不抖
+    s.stiffness   = 170.0;
+    s.mass        = 1.0;
+    s.initialVelocity = 0.0;
+    s.duration    = s.settlingDuration;
     return s;
 }
 
-// 弹跳回弹（图标）
+// 图标弹跳：幅度收敛、曲线改 easeOut、时长加长（比原来的 easeInEaseOut + 1.09 更柔）
 void IOS27BounceLayer(CALayer *layer) {
     CAKeyframeAnimation *pop = [CAKeyframeAnimation animationWithKeyPath:@"transform.scale"];
-    pop.values   = @[@1.0, @1.09, @0.97, @1.0];
-    pop.keyTimes = @[@0.0, @0.4, @0.72, @1.0];
-    pop.duration = 0.42;
-    pop.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
+    pop.values    = @[@1.0, @1.055, @0.992, @1.0];
+    pop.keyTimes  = @[@0.0, @0.34, @0.68, @1.0];
+    pop.duration  = 0.52;
+    pop.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseOut];
     [layer addAnimation:pop forKey:@"ios27bounce"];
 }
 
-// 锁屏整体入场：缩放 + 渐显
+// 锁屏整体入场：轻微缩放 + 柔和渐显（改为大阻尼 spring，时长 0.5s）
 void IOS27AnimateLockScreenIn(UIView *view) {
-    view.alpha = 0.2;
-    view.transform = CGAffineTransformMakeScale(1.06, 1.06);
-    [UIView animateWithDuration:0.55
-                          delay:0
-         usingSpringWithDamping:0.85
-          initialSpringVelocity:0.4
-                        options:UIViewAnimationOptionCurveEaseOut
+    view.alpha = 0.45;
+    view.transform = CGAffineTransformMakeScale(1.035, 1.035);
+    [UIView animateWithDuration:0.5 delay:0
+         usingSpringWithDamping:0.84 initialSpringVelocity:0.18
+                        options:UIViewAnimationOptionCurveEaseOut | UIViewAnimationOptionBeginFromCurrentState
                      animations:^{
         view.transform = CGAffineTransformIdentity;
         view.alpha = 1.0;
     } completion:nil];
 }
 
-// 通知横幅滑入 + 回弹
+// 通知横幅滑入 + 轻回弹（位移收敛 44→32，阻尼加大）
 void IOS27AnimateBannerIn(UIView *view) {
-    view.layer.transform = CATransform3DMakeTranslation(0, -44, 0);
+    view.layer.transform = CATransform3DMakeTranslation(0, -32, 0);
     view.alpha = 0.0;
-    [UIView animateWithDuration:0.50
-                          delay:0
-         usingSpringWithDamping:0.82
-          initialSpringVelocity:0.6
-                        options:UIViewAnimationOptionCurveEaseOut
+    [UIView animateWithDuration:0.52 delay:0
+         usingSpringWithDamping:0.80 initialSpringVelocity:0.30
+                        options:UIViewAnimationOptionCurveEaseOut | UIViewAnimationOptionBeginFromCurrentState
                      animations:^{
         view.layer.transform = CATransform3DIdentity;
         view.alpha = 1.0;
     } completion:nil];
 }
 
-#pragma mark - 应用开合转场覆盖层
+#pragma mark - 应用开合转场覆盖层（去掉黑遮罩，改为柔和缩放淡出/淡入）
 
 @implementation IOS27ZoomOverlay {
     UIView *_overlay;
@@ -127,9 +121,11 @@ void IOS27AnimateBannerIn(UIView *view) {
     return img;
 }
 
+// 关键：背景改为透明（不再纯黑），消除“闪黑/压暗”的生硬感
 - (UIView *)makeOverlayOnHost:(UIView *)host {
     UIView *ov = [[UIView alloc] initWithFrame:host.bounds];
-    ov.backgroundColor = [UIColor blackColor];
+    ov.backgroundColor = [UIColor clearColor];
+    ov.userInteractionEnabled = NO;
     UIImage *img = [self snapshotOfView:host];
     if (img) {
         UIImageView *iv = [[UIImageView alloc] initWithFrame:host.bounds];
@@ -140,7 +136,7 @@ void IOS27AnimateBannerIn(UIView *view) {
     return ov;
 }
 
-// App 即将打开：画面微微放大压暗，随后淡出露出 App —— 模拟“推入”转场
+// App 即将打开：旧画面轻微放大 + 柔和淡出，露出 App（无闪黑，spring 0.4s）
 - (void)appWillOpen {
     if (!IOS27Enabled() || !IOS27AppTransition()) return;
     _appIsOpen = YES;
@@ -150,24 +146,24 @@ void IOS27AnimateBannerIn(UIView *view) {
     if (_overlay) { [_overlay removeFromSuperview]; _overlay = nil; }
 
     UIView *ov = [self makeOverlayOnHost:host];
-    ov.alpha = 0.0;
+    ov.alpha = 1.0;
+    ov.transform = CGAffineTransformIdentity;
     [host addSubview:ov];
     _overlay = ov;
 
-    [UIView animateWithDuration:0.26 delay:0 options:UIViewAnimationOptionCurveEaseIn animations:^{
-        ov.alpha = 1.0;
-        ov.transform = CGAffineTransformMakeScale(1.12, 1.12);
+    [UIView animateWithDuration:0.40 delay:0
+         usingSpringWithDamping:0.92 initialSpringVelocity:0.15
+                        options:UIViewAnimationOptionCurveEaseOut | UIViewAnimationOptionBeginFromCurrentState
+                     animations:^{
+        ov.transform = CGAffineTransformMakeScale(1.06, 1.06);
+        ov.alpha = 0.0;
     } completion:^(BOOL finished) {
-        [UIView animateWithDuration:0.14 animations:^{
-            ov.alpha = 0.0;
-        } completion:^(BOOL f2) {
-            [ov removeFromSuperview];
-            if (_overlay == ov) _overlay = nil;
-        }];
+        [ov removeFromSuperview];
+        if (_overlay == ov) _overlay = nil;
     }];
 }
 
-// 回到桌面：从图标位弹簧放大展开 —— 模拟“开屏拉近”转场
+// 回到桌面：画面从略小柔和展开 + 渐显，随后缓慢淡出露出桌面（全程 spring）
 - (void)appDidReturnHome {
     if (!_appIsOpen) return;
     _appIsOpen = NO;
@@ -179,29 +175,35 @@ void IOS27AnimateBannerIn(UIView *view) {
 
     UIView *ov = [self makeOverlayOnHost:host];
     ov.alpha = 0.0;
-    ov.transform = CGAffineTransformMakeScale(0.32, 0.32);
+    ov.transform = CGAffineTransformMakeScale(0.94, 0.94);
     [host addSubview:ov];
     _overlay = ov;
 
-    [UIView animateWithDuration:0.44 delay:0
-         usingSpringWithDamping:0.82 initialSpringVelocity:0.6
-                        options:UIViewAnimationOptionCurveEaseOut
+    [UIView animateWithDuration:0.42 delay:0
+         usingSpringWithDamping:0.88 initialSpringVelocity:0.22
+                        options:UIViewAnimationOptionCurveEaseOut | UIViewAnimationOptionBeginFromCurrentState
                      animations:^{
         ov.transform = CGAffineTransformIdentity;
         ov.alpha = 1.0;
     } completion:^(BOOL finished) {
-        [UIView animateWithDuration:0.18 animations:^{
-            ov.alpha = 0.0;
-        } completion:^(BOOL f2) {
-            [ov removeFromSuperview];
-            if (_overlay == ov) _overlay = nil;
-        }];
+        // 停留一小段，再用较长时长缓慢淡出（避免突然消失）
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.20 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            [UIView animateWithDuration:0.26 delay:0
+                                  options:UIViewAnimationOptionCurveEaseOut
+                             animations:^{
+                ov.alpha = 0.0;
+            } completion:^(BOOL f2) {
+                [ov removeFromSuperview];
+                if (_overlay == ov) _overlay = nil;
+            }];
+        });
     }];
 }
 
 @end
 
-#pragma mark - 灵动岛
+#pragma mark - 灵动岛（展开阻尼收敛，收起改 easeOut 平滑）
 
 @implementation IOS27Island {
     UIView *_pill;
@@ -252,7 +254,7 @@ void IOS27AnimateBannerIn(UIView *view) {
     _visible = YES;
     _pill.hidden = NO;
     _pill.alpha = 1.0;
-    _pill.transform = CGAffineTransformMakeScale(0.4, 0.4);
+    _pill.transform = CGAffineTransformMakeScale(0.55, 0.55);
 
     CGRect target = _pill.frame;
     target.size.width = 216;
@@ -269,9 +271,9 @@ void IOS27AnimateBannerIn(UIView *view) {
     };
 
     if (animated) {
-        [UIView animateWithDuration:0.5 delay:0
-             usingSpringWithDamping:0.6 initialSpringVelocity:0.8
-                            options:UIViewAnimationOptionCurveEaseOut
+        [UIView animateWithDuration:0.55 delay:0
+             usingSpringWithDamping:0.74 initialSpringVelocity:0.35
+                            options:UIViewAnimationOptionCurveEaseOut | UIViewAnimationOptionBeginFromCurrentState
                          animations:expand completion:complete];
     } else {
         expand();
@@ -283,16 +285,17 @@ void IOS27AnimateBannerIn(UIView *view) {
     _visible = NO;
     if (!_pill) return;
     void (^collapse)(void) = ^{
-        _pill.transform = CGAffineTransformMakeScale(0.2, 0.2);
+        _pill.transform = CGAffineTransformMakeScale(0.35, 0.35);
         _pill.alpha = 0.0;
     };
     void (^complete)(BOOL) = ^(BOOL finished) {
         _pill.hidden = YES;
+        _pill.transform = CGAffineTransformIdentity;
     };
     if (animated) {
-        [UIView animateWithDuration:0.4 delay:0
-             usingSpringWithDamping:0.9 initialSpringVelocity:0.3
-                            options:UIViewAnimationOptionCurveEaseIn
+        [UIView animateWithDuration:0.36 delay:0
+             usingSpringWithDamping:0.94 initialSpringVelocity:0.15
+                            options:UIViewAnimationOptionCurveEaseOut | UIViewAnimationOptionBeginFromCurrentState
                          animations:collapse completion:complete];
     } else {
         collapse();
